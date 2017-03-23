@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"regexp"
 	"strings"
+	"gopkg.in/guregu/null.v3"
 	"unicode"
 	"unicode/utf8"
 
@@ -162,6 +163,7 @@ func Strings(iface interface{}) error {
 	for i := 0; i < ift.NumField(); i++ {
 		v := ift.Field(i)
 		el := reflect.Indirect(ifv.Elem().FieldByName(v.Name))
+		
 		switch el.Kind() {
 		case reflect.Slice:
 			if el.CanInterface() {
@@ -180,7 +182,13 @@ func Strings(iface interface{}) error {
 				}
 			}
 		case reflect.Struct:
-			if el.CanAddr() && el.Addr().CanInterface() {
+			if el.Type() == reflect.TypeOf(null.String{}) {
+				f := el.FieldByName("String")
+    			if f.IsValid() && f.CanSet() && f.Kind() == reflect.String {
+					tags := v.Tag.Get("conform")
+		            f.SetString(transformString(f.Interface().(string),tags))
+    			}
+			} else if el.CanAddr() && el.Addr().CanInterface() {
 				Strings(el.Addr().Interface())
 			}
 		case reflect.String:
@@ -189,6 +197,19 @@ func Strings(iface interface{}) error {
 				input := el.String()
 				el.SetString(transformString(input, tags))
 			}
+		// case reflect.Value:
+		// 	if el.CanSet() {
+		// 		tags := v.Tag.Get("conform")
+		// 		if valuer, ok := el.Interface().(driver.Valuer); ok {
+
+		// 			input, err := valuer.Value()
+		// 			if err == nil {
+		// 				panic( err)
+		// 			}
+		// 			// handle the error how you want
+		// 			el.SetString(transformString(el.Interface().(string), tags))
+		// 		}
+		// 	}
 		}
 	}
 	return nil
